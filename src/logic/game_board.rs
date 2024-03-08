@@ -137,16 +137,22 @@ impl GameBoard {
     }
 
     fn is_cell_next_to_independent(&self, row: usize, col: usize) -> bool {
-        if self.get_cell_state(row, col + 1) == Cell::Independent {
+        let (left, _) = col.overflowing_sub(1);
+        let right = col + 1;
+
+        let (up, _) = row.overflowing_sub(1);
+        let down = row + 1;
+
+        if self.get_cell_state(row, right) == Cell::Independent {
             return true;
         }
-        if self.get_cell_state(row, col - 1) == Cell::Independent {
+        if self.get_cell_state(row, left) == Cell::Independent {
             return true;
         }
-        if self.get_cell_state(row + 1, col) == Cell::Independent {
+        if self.get_cell_state(down, col) == Cell::Independent {
             return true;
         }
-        if self.get_cell_state(row - 1, col) == Cell::Independent {
+        if self.get_cell_state(up, col) == Cell::Independent {
             return true;
         }
         false
@@ -224,11 +230,19 @@ impl GameBoard {
             return PlaceTileResult::ConflictCreated(CellConflictType::NewChain);
         }
 
-        if self.would_cell_merge_chains(row, col) {
-            let adjacent_hotels = self.get_adjacent_hotels(row, col);
+        let adjacent_hotels = self.get_adjacent_hotels(row, col);
+
+        if adjacent_hotels.len() > 1 {
             let number_of_mergers = adjacent_hotels.len() - 1;
             self.cells[row][col] = Cell::Conflict(CellConflictType::Merge(number_of_mergers));
             return PlaceTileResult::ConflictCreated(CellConflictType::Merge(number_of_mergers));
+        }
+
+        self.cells[row][col] = Cell::Independent;
+
+        if adjacent_hotels.len() == 1 {
+            self.flood_hotel(row, col, adjacent_hotels[0]);
+            return PlaceTileResult::Success;
         }
 
         PlaceTileResult::Success
@@ -247,10 +261,17 @@ impl GameBoard {
                 }
             }
             board.cells[row][col] = Cell::Hotel(hotel);
-            fill(board, row + 1, col, hotel);
-            fill(board, row - 1, col, hotel);
-            fill(board, row, col + 1, hotel);
-            fill(board, row, col - 1, hotel);
+
+            let (left, _) = col.overflowing_sub(1);
+            let right = col + 1;
+
+            let (up, _) = row.overflowing_sub(1);
+            let down = row + 1;
+
+            fill(board, down, col, hotel);
+            fill(board, up, col, hotel);
+            fill(board, row, right, hotel);
+            fill(board, row, left, hotel);
         }
 
         fill(self, row, col, hotel);
@@ -464,5 +485,46 @@ mod tests {
             game_board.is_cell_playable(1, 0),
             Err(CellNotPlayableReason::AdjacentHotelsAreSafe)
         );
+    }
+
+    #[test]
+    fn test_place_tile() {
+        // basic
+        let mut game_board = GameBoard::new();
+        assert_eq!(game_board.place_tile(0, 0), PlaceTileResult::Success);
+        assert_eq!(game_board.cells[0][0], Cell::Independent);
+
+        // placing a tile would create a new chain
+        assert_eq!(
+            game_board.place_tile(0, 1),
+            PlaceTileResult::ConflictCreated(CellConflictType::NewChain),
+        );
+
+        // placing a tile would start a merger
+        let mut game_board = GameBoard::new();
+
+        for (i, hotel) in [Hotel::Worldwide, Hotel::Continental].iter().enumerate() {
+            for j in 0..2 {
+                game_board.cells[i * 2][j] = Cell::Hotel(*hotel);
+            }
+        }
+
+        for (i, hotel) in [Hotel::Imperial].iter().enumerate() {
+            for j in 0..2 {
+                game_board.cells[i * 2 + 1][j + 2] = Cell::Hotel(*hotel);
+            }
+        }
+        assert_eq!(
+            game_board.place_tile(1, 1),
+            PlaceTileResult::ConflictCreated(CellConflictType::Merge(2))
+        );
+
+        // placing a tile causes a chain to grow
+        let mut game_board = GameBoard::new();
+        game_board.cells[0][0] = Cell::Hotel(Hotel::Luxor);
+        game_board.cells[0][2] = Cell::Independent;
+        game_board.cells[1][2] = Cell::Independent;
+        assert_eq!(game_board.place_tile(0, 1), PlaceTileResult::Success);
+        assert_eq!(game_board.get_hotel_chain_size(Hotel::Luxor), 4);
     }
 }

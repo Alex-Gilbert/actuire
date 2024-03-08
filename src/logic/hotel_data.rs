@@ -120,3 +120,31 @@ impl Iterator for HotelIter {
         result
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_count() {
+        assert_eq!(Hotel::count(), 7);
+    }
+
+    #[test]
+    fn test_get_hotel_row_advantage() {
+        assert_eq!(Hotel::Tower.get_hotel_row_advantage(), 0);
+        assert_eq!(Hotel::Luxor.get_hotel_row_advantage(), 0);
+        assert_eq!(Hotel::American.get_hotel_row_advantage(), 1);
+        assert_eq!(Hotel::Worldwide.get_hotel_row_advantage(), 1);
+        assert_eq!(Hotel::Festival.get_hotel_row_advantage(), 1);
+        assert_eq!(Hotel::Imperial.get_hotel_row_advantage(), 2);
+        assert_eq!(Hotel::Continental.get_hotel_row_advantage(), 2);
+    }
+
+    #[test]
+    fn test_get_row_from_chain_length() {
+        assert_eq!(Hotel::Tower.get_row_from_chain_length(2), 0);
+        assert_eq!(Hotel::American.get_row_from_chain_length(5), 4);
+        assert_eq!(Hotel::Imperial.get_row_from_chain_length(11), 7);
+    }
+}
