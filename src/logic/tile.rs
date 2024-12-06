@@ -22,3 +22,19 @@ impl fmt::Display for Tile {
         write!(f, "{}-{}", self.col + 1, (b'A' + self.row as u8) as char)
     }
 }
+
+// Implement PartialOrd and Ord for Tile
+impl PartialOrd for Tile {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Tile {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match self.col.cmp(&other.col) {
+            std::cmp::Ordering::Equal => self.row.cmp(&other.row),
+            other => other,
+        }
+    }
+}

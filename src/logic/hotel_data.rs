@@ -24,9 +24,9 @@ impl Hotel {
         }
     }
 
-    fn get_row_from_chain_length(&self, chain_length: usize) -> usize {
-        let base_row = match chain_length {
-            2 => 0,
+    fn get_row_from_chain_length(&self, chain_length: usize) -> u32 {
+        let base_row: u32 = match chain_length {
+            0..=2 => 0,
             3 => 1,
             4 => 2,
             5 => 3,
@@ -36,18 +36,18 @@ impl Hotel {
             31..=40 => 7,
             _ => 8,
         };
-        base_row + self.get_hotel_row_advantage()
+        base_row + self.get_hotel_row_advantage() as u32
     }
 
-    pub fn get_stock_value(&self, chain_length: usize) -> usize {
+    pub fn get_stock_value(&self, chain_length: usize) -> u32 {
         (self.get_row_from_chain_length(chain_length) + 2) * 100
     }
 
-    pub fn get_majority_holder_bonus(&self, chain_length: usize) -> usize {
+    pub fn get_majority_holder_bonus(&self, chain_length: usize) -> u32 {
         self.get_stock_value(chain_length) * 10
     }
 
-    pub fn get_minority_holder_bonus(&self, chain_length: usize) -> usize {
+    pub fn get_minority_holder_bonus(&self, chain_length: usize) -> u32 {
         self.get_stock_value(chain_length) * 5
     }
 

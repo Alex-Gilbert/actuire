@@ -9,7 +9,7 @@ pub mod visuals;
 #[derive(Debug, structopt::StructOpt)]
 struct Opt {
     /// the number of players
-    #[structopt(short = "-p", long, default_value = "3")]
+    #[structopt(short = "-p", long, default_value = "2")]
     players: usize,
 
     /// The width of each cell.
@@ -22,15 +22,14 @@ struct Opt {
 }
 
 fn main() -> Result<()> {
-    let Opt { players, cell_width, cell_height } = Opt::from_args();
+    let Opt {
+        players,
+        cell_width,
+        cell_height,
+    } = Opt::from_args();
 
     let mut terminal = tui::init()?;
-    let mut tui_app = TuiApp::builder()
-        .cell_width(cell_width)
-        .cell_height(cell_height)
-        .acquire_game(logic::acquire_game::AcquireGame::new(players))
-        .exit(false)
-        .build();
+    let mut tui_app = TuiApp::new(cell_width, cell_height, players);
 
     let app_result = tui_app.run(&mut terminal);
     tui::restore()?;

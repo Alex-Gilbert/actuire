@@ -1,3 +1,6 @@
+use core::fmt;
+use std::fmt::Debug;
+
 use super::hotel_data::Hotel;
 
 pub const BOARD_ROWS: usize = 9;
@@ -27,6 +30,18 @@ pub enum CellNotPlayableReason {
     CellIsOffBoard,
 }
 
+impl CellNotPlayableReason {
+    pub fn as_display_message(&self) -> String {
+        match self {
+            CellNotPlayableReason::ConflictOnBoard => "There is a conflict on the board".to_string(),
+            CellNotPlayableReason::HotelsAreAllActive => "All hotels are currently active, cannot start a new chain".to_string(),
+            CellNotPlayableReason::AdjacentHotelsAreSafe => "Adjacent hotels are safe and cannot be merged".to_string(),
+            CellNotPlayableReason::CellIsNotEmpty => "The cell is not empty".to_string(),
+            CellNotPlayableReason::CellIsOffBoard => "The cell is off the board".to_string(),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum PlaceTileResult {
     Success,
@@ -35,7 +50,7 @@ pub enum PlaceTileResult {
 }
 
 pub struct GameBoard {
-    cells: [[Cell; BOARD_COLS]; BOARD_ROWS],
+    pub cells: [[Cell; BOARD_COLS]; BOARD_ROWS],
 }
 
 impl GameBoard {
@@ -76,7 +91,6 @@ impl GameBoard {
                 active_hotels.push(hotel);
             }
         }
-
         active_hotels
     }
 
@@ -209,7 +223,7 @@ impl GameBoard {
         Ok(true)
     }
 
-    fn get_conflict_on_board(&self) -> Option<(usize, usize, CellConflictType)> {
+    pub fn get_conflict_on_board(&self) -> Option<(usize, usize, CellConflictType)> {
         for row in 0..BOARD_ROWS {
             for col in 0..BOARD_COLS {
                 if let Cell::Conflict(conflict_type) = self.cells[row][col] {
@@ -277,43 +291,75 @@ impl GameBoard {
         fill(self, row, col, hotel);
     }
 
-    pub fn acceptable_conflict_resolutions(&self) -> Option<Vec<Hotel>> {
-        let conflict = self.get_conflict_on_board()?;
-        let (row, col, conflict_type) = conflict;
-        match conflict_type {
-            CellConflictType::NewChain => Some(self.get_inactive_hotels()),
-            CellConflictType::Merge(_) => {
-                let adjacent_hotels = self.get_adjacent_hotels(row, col);
-                let max_chain_size = adjacent_hotels
-                    .iter()
-                    .map(|hotel| self.get_hotel_chain_size(*hotel))
-                    .max()
-                    .unwrap();
+    pub fn acceptable_conflict_resolutions(&self) -> Vec<Hotel> {
+        if let Some(conflict) = self.get_conflict_on_board() {
+            let (row, col, conflict_type) = conflict;
+            match conflict_type {
+                CellConflictType::NewChain => self.get_inactive_hotels(),
+                CellConflictType::Merge(_) => {
+                    let adjacent_hotels = self.get_adjacent_hotels(row, col);
+                    let max_chain_size = adjacent_hotels
+                        .iter()
+                        .map(|hotel| self.get_hotel_chain_size(*hotel))
+                        .max()
+                        .unwrap();
 
-                Some(
                     adjacent_hotels
                         .iter()
                         .filter(|hotel| self.get_hotel_chain_size(**hotel) == max_chain_size)
                         .cloned()
-                        .collect(),
-                )
+                        .collect()
+                }
             }
+        } else {
+            Vec::new()
         }
     }
 
     pub fn resolve_conflict(&mut self, hotel: Hotel) -> Result<(), &str> {
         let acceptable_hotels = self.acceptable_conflict_resolutions();
-        if let Some(acceptable_hotels) = acceptable_hotels {
-            if !acceptable_hotels.contains(&hotel) {
-                return Err("Hotel is not an acceptable resolution");
-            }
-            let conflict = self.get_conflict_on_board().unwrap();
-            let (row, col, _) = conflict;
+        if !acceptable_hotels.contains(&hotel) {
+            return Err("Hotel is not an acceptable resolution");
+        }
+        let conflict = self.get_conflict_on_board().unwrap();
+        let (row, col, _) = conflict;
 
-            self.flood_hotel(row, col, hotel);
-            Ok(())
-        } else {
-            Err("No conflict to resolve")
+        self.flood_hotel(row, col, hotel);
+        Ok(())
+    }
+
+    pub fn place_initial_tile(&mut self, row: usize, col: usize) {
+        self.cells[row][col] = Cell::Independent;
+    }
+
+    pub fn get_hotel_stock_price(&self, hotel: Hotel) -> u32 {
+        let chain_length = self.get_hotel_chain_size(hotel);
+        hotel.get_stock_value(chain_length)
+    }
+
+    pub fn get_hotel_majority_stock_bonus(&self, hotel: Hotel) -> u32 {
+        let chain_length = self.get_hotel_chain_size(hotel);
+        hotel.get_majority_holder_bonus(chain_length)
+    }
+
+    pub fn get_hotel_minority_stock_bonus(&self, hotel: Hotel) -> u32 {
+        let chain_length = self.get_hotel_chain_size(hotel);
+        hotel.get_minority_holder_bonus(chain_length)
+    }
+
+    pub fn replace_defunct_hotel_with_surviving_hotel(
+        &mut self,
+        defunct_hotel: Hotel,
+        surviving_hotel: Hotel,
+    ) {
+        for row in 0..BOARD_ROWS {
+            for col in 0..BOARD_COLS {
+                if let Cell::Hotel(hotel) = self.cells[row][col] {
+                    if hotel == defunct_hotel {
+                        self.cells[row][col] = Cell::Hotel(surviving_hotel);
+                    }
+                }
+            }
         }
     }
 }
